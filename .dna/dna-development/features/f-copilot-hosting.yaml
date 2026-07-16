@@ -1,0 +1,32 @@
+apiVersion: github.com/ruinosus/dna/sdlc/v1
+kind: Feature
+metadata:
+  name: f-copilot-hosting
+spec:
+  title: "Copilot hosting \u2014 emit the hosted-agent variant (image + manifest per\
+    \ runtime)"
+  description: "A hosting/deployment dimension: beyond the self-hosted AG-UI app,\
+    \ emit the HOSTED variant per runtime \u2014 MS-AF \u2192 Azure AI Foundry Agent\
+    \ Service (ResponsesHostServer, Responses protocol :8088, agent.yaml + Dockerfile,\
+    \ single-identity, Foundry gateway); LangGraph \u2192 LangGraph Platform (langgraph.json\
+    \ + image); Agno \u2192 AgentOS/control plane. Image + manifest + serving protocol\
+    \ + identity per target. Feeds f-copilot-infra-binding (ACR image, Foundry agent\
+    \ registration, gateway). Grounded in foundry-assured apps/hosted-agent. Research-gated."
+  status: discovery
+  epic: e-dna-copilot-absorption
+  reporter: claude-code
+  priority: high
+  labels:
+  - copilot
+  - hosting
+  - deployment
+  - absorption
+  business_value: 750
+  created_at: '2026-07-16T15:16:09+00:00'
+  updated_at: '2026-07-16T15:16:09+00:00'
+  timeline:
+  - at: '2026-07-16T15:16:09+00:00'
+    actor: claude-code
+    type: status_change
+    source: cli
+    to: discovery

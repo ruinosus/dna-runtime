@@ -1,0 +1,30 @@
+apiVersion: github.com/ruinosus/dna/sdlc/v1
+kind: Feature
+metadata:
+  name: f-copilot-persistence
+spec:
+  title: "Copilot persistence \u2014 declarative storage/state backends (Postgres\
+    \ v1 + Mongo doc)"
+  description: 'A persistence block on the Copilot Kind (checkpoint/memory/cache)
+    + knowledge.store (vector backend), emitted per framework (LangGraph checkpointer/Store,
+    Agno db=/knowledge=, MS-AF store), killing the hardcoded InMemoryDb. v1: Postgres
+    functional across all 3 + a documented Mongo path (with honest LangGraph-memory
+    / MS-AF gaps). Vector store lives INSIDE knowledge (decided). Feeds f-copilot-infra-binding.'
+  status: discovery
+  epic: e-dna-copilot-absorption
+  reporter: claude-code
+  priority: high
+  labels:
+  - copilot
+  - persistence
+  - storage
+  - absorption
+  business_value: 800
+  created_at: '2026-07-16T15:16:05+00:00'
+  updated_at: '2026-07-16T15:16:05+00:00'
+  timeline:
+  - at: '2026-07-16T15:16:05+00:00'
+    actor: claude-code
+    type: status_change
+    source: cli
+    to: discovery

@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from dna.application.live import LiveDna
+from dna.kernel.protocols import LayerPolicyViolationError  # noqa: F401  (re-exported for the face)
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,79 @@ def _doc_spec(d: Any) -> dict[str, Any]:
         return s
     raw = getattr(d, "_raw", None) or {}
     return raw.get("spec", {}) if isinstance(raw, dict) else {}
+
+
+def _doc_spec_from_mi(mi: Any, kind: str, name: str) -> dict[str, Any] | None:
+    """Return the spec dict for (kind, name) from a materialized
+    ManifestInstance, or None if absent.
+
+    ``mi.documents`` yields :class:`~dna.kernel.document.Document` — attribute
+    access (``d.kind``/``d.name``), never a dict — the same blessed idiom
+    ``ManifestInstance.one()``'s deprecation warning recommends callers switch
+    to. Reuses :func:`_doc_spec` (the same spec-extraction ``genome_view_impl``
+    uses) rather than re-deriving it.
+    """
+    d = next((d for d in mi.documents if d.kind == kind and d.name == name), None)
+    return _doc_spec(d) if d is not None else None
+
+
+async def read_definition_impl(
+    live: "LiveDna", *, scope: str, tenant: str | None, kind: str, name: str,
+) -> dict[str, Any]:
+    """Read a definition as the tenant sees it: the effective (composed) spec, the
+    inherited base spec, whether the tenant has an override, and the Kind's edit
+    schema (ui_schema + overlayable fields) so the portal can render a form."""
+    base_mi = await live.mi(scope)                 # no tenant → base only
+    eff_mi = await live.mi(scope, tenant) if tenant else base_mi
+    base = _doc_spec_from_mi(base_mi, kind, name)
+    effective = _doc_spec_from_mi(eff_mi, kind, name)
+    if effective is None and base is None:
+        raise ValueError(f"no {kind} named {name!r} in scope {scope!r}")
+    port = live.kernel.kind_port_for(kind)
+    ui_schema = dict(getattr(port, "ui_schema", {}) or {}) if port else {}
+    overlayable = sorted(getattr(port, "OVERLAYABLE_FIELDS", frozenset()) or []) if port else []
+    return {
+        "kind": kind, "name": name,
+        "overridden": effective != base and base is not None,
+        "overlayable": bool(overlayable),
+        "effective": effective if effective is not None else (base or {}),
+        "base": base,
+        "ui_schema": ui_schema,
+        "overlayable_fields": list(overlayable),
+    }
+
+
+def _api_version_for_kind(live: "LiveDna", kind: str) -> str:
+    """The apiVersion a write for `kind` should carry — taken from the registered
+    KindPort's descriptor, falling back to the DNA v1 API string."""
+    port = live.kernel.kind_port_for(kind)
+    return getattr(port, "api_version", None) or "github.com/ruinosus/dna/v1"
+
+
+async def apply_definition_impl(
+    live: "LiveDna", *, scope: str, tenant: str, kind: str, name: str, spec: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist a tenant override via a tenant-layer write. The write pipeline's
+    layer-policy check vetoes a LOCKED Kind / non-overlayable field, raising
+    LayerPolicyViolationError (the face maps it to 403)."""
+    if not (tenant or "").strip():
+        raise ValueError("tenant is required to write a definition override")
+    api_version = _api_version_for_kind(live, kind)
+    raw = {"apiVersion": api_version, "kind": kind,
+           "metadata": {"name": name}, "spec": dict(spec or {})}
+    version = await live.kernel.write_document(
+        scope, kind, name, raw, tenant=tenant, invalidate_mode="doc")
+    return {"kind": kind, "name": name, "version": version, "overridden": True}
+
+
+async def revert_definition_impl(
+    live: "LiveDna", *, scope: str, tenant: str, kind: str, name: str,
+) -> dict[str, Any]:
+    """Remove the tenant override → reads fall back to the inherited base."""
+    if not (tenant or "").strip():
+        raise ValueError("tenant is required to revert a definition override")
+    await live.kernel.delete_document(scope, kind, name, tenant=tenant)
+    return {"kind": kind, "name": name, "overridden": False}
 
 
 async def genome_view_impl(
